@@ -44,6 +44,8 @@ Reference values are committed in `tests/reference.json`; regenerating them requ
 
 Distribution definitions: [SciPy Beta](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.beta.html), [Beta–Binomial](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.betabinom.html), [Gamma](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gamma.html), [Poisson](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.poisson.html), and [Normal](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.norm.html).
 
-## Future deployment
+## GitHub Pages
 
-The root `index.html`, `style.css`, `math.js`, and `app.js` are ready for static hosting, including GitHub Pages. All asset paths are relative so a repository subpath works. This prototype has not been deployed.
+The site is published at <https://guy-r-davies.github.io/Vdnc/>. The root `index.html`, `style.css`, `math.js`, and `app.js` are static files. All asset paths are relative so a repository subpath works.
+
+After changing an asset, run `python3 scripts/version_assets.py` before committing. This updates the content-based versions in `index.html` so a deployment requests the matching CSS and JavaScript instead of cached files. The browser test runner checks these versions before running. Summary updates also support the original HTML IDs while older pages remain cached.

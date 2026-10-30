@@ -1,6 +1,12 @@
 "use strict";
 (() => {
   const $ = id => document.getElementById(id);
+  // Older HTML may remain cached during deployment. Resolve both versions
+  // inside the summary so the mean input can never shadow its readout.
+  const summary=document.querySelector(".distribution-stats");
+  const priorMeanValue=summary.querySelector("#prior-mean-value, #prior-mean");
+  const dataEstimateValue=summary.querySelector("#data-estimate-value, #data-estimate");
+  const posteriorMeanValue=summary.querySelector("#posterior-mean-value, #posterior-mean");
   const config = {
     beta: {pair:"Beta prior · Binomial likelihood",priorFamily:"Beta(α, β)",dataFamily:"Binomial(n, θ)",
       prior:{a:1,b:1},data:{k:8,n:12},
@@ -98,9 +104,9 @@
   }
   function update() {
     current=Bayes.model(family,prior,data); reference=pinned?Bayes.model(family,pinned,data):null;
-    $("prior-mean-value").textContent=fmt(current.priorMean); $("prior-mean-value").title=current.priorDescription;
-    $("posterior-mean-value").textContent=fmt(current.posteriorMean); $("posterior-mean-value").title=current.posteriorDescription;
-    $("data-estimate-value").textContent=fmt(current.estimate);
+    priorMeanValue.textContent=fmt(current.priorMean); priorMeanValue.title=current.priorDescription;
+    posteriorMeanValue.textContent=fmt(current.posteriorMean); posteriorMeanValue.title=current.posteriorDescription;
+    dataEstimateValue.textContent=fmt(current.estimate);
     document.querySelectorAll("[data-preset]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.preset===activePreset)));
     const experiment=$("experiment");
     if(family==="beta") {

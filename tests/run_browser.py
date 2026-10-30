@@ -2,6 +2,7 @@
 import argparse
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -10,6 +11,7 @@ parser.add_argument("--browser", required=True, help="Chrome or Chromium executa
 parser.add_argument("--url", default="http://127.0.0.1:8765")
 parser.add_argument("--screenshots", action="store_true")
 args = parser.parse_args()
+subprocess.run([sys.executable, str(Path(__file__).resolve().parent.parent / "scripts" / "version_assets.py"), "--check"], check=True)
 
 
 def chrome(extra):
