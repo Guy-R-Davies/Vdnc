@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Bayesian widget checks</title><script src="../math.js"></script></head>
+<body><pre id="result">Running…</pre><iframe id="app" src="../index.html" style="width:1200px;height:1000px;border:0"></iframe>
+<script>
+"use strict";
+let count=0;
+const errors=[];
+window.addEventListener("error",e=>errors.push(e.message));
+const assert=(ok,message)=>{if(!ok)throw Error(message);count++;};
+const close=(a,b,message)=>assert(Math.abs(a-b)<2e-9*Math.max(1,Math.abs(b)),`${message}: ${a} vs ${b}`);
+const pause=()=>new Promise(r=>setTimeout(r,80));
+const frame=document.getElementById("app");
+const loaded=new Promise(r=>frame.addEventListener("load",r,{once:true}));
+async function run(){
+  const cases=await (await fetch("reference.json")).json();
+  for(const c of cases){
+    const m=Bayes.model(c.family,c.prior,c.data);
+    close(m.logZ,c.logZ,c.family+" evidence against SciPy");
+    close(m.priorLog(c.x),c.priorLog,c.family+" prior against SciPy");
+    close(m.posteriorLog(c.x),c.posteriorLog,c.family+" posterior against SciPy");
+    close(m.likelihoodLog(c.x),c.likelihoodLog,c.family+" likelihood against SciPy");
+    close(m.posteriorLog(c.x),m.priorLog(c.x)+m.likelihoodLog(c.x)-m.logZ,c.family+" Bayes identity");
+  }
+  // Independent quadrature of the normalized curves and prior × likelihood.
+  const integrate=(fn,a,b)=>{
+    const n=20000,h=(b-a)/n;let sum=0;
+    for(let i=0;i<n;i++)sum+=Math.exp(fn(a+(i+.5)*h));
+    return sum*h;
+  };
+  for(const c of cases.filter((_,i)=>[0,4,5,9,12].includes(i))){
+    const m=Bayes.model(c.family,c.prior,c.data),[a,b]=m.bounds;
+    for(const [name,fn] of [["prior",m.priorLog],["posterior",m.posteriorLog],["likelihood",m.likelihoodDensityLog]]){
+      assert(Math.abs(integrate(fn,a,b)-1)<.0001,c.family+" normalized "+name);
+    }
+    assert(Math.abs(integrate(x=>m.priorLog(x)+m.likelihoodLog(x),a,b)/Math.exp(m.logZ)-1)<.0001,c.family+" integrated evidence");
+  }
+  for(let n=1;n<=15;n++){
+    for(let k=0;k<=n;k++)close(Math.exp(Bayes.model("beta",{a:1,b:1},{k,n}).logZ),1/(n+1),"Uniform-prior predictive count");
+  }
+  assert(Bayes.betaLog(0,.1,1)===Infinity,"Beta singular boundary");
+  close(Bayes.betaLog(0,1,1),0,"Uniform beta endpoint");
+  assert(Bayes.gammaLog(0,.1,1)===Infinity,"Gamma singular boundary");
+  await loaded;await pause();
+  const w=frame.contentWindow,d=w.document,$=id=>d.getElementById(id);
+  w.addEventListener("error",e=>errors.push(e.message));
+  const change=(id,value,type="change")=>{const e=$(id);e.value=value;e.dispatchEvent(new w.Event(type,{bubbles:true}));};
+  const click=id=>$(id).click();
+  const validPlot=()=>{
+    assert($("plot").querySelectorAll("path").length>=5,"Plot rendered");
+    for(const path of $("plot").querySelectorAll("path"))assert(!/NaN|Infinity|undefined/.test(path.getAttribute("d")),"Finite SVG path");
+    assert(!d.documentElement.scrollWidth || d.documentElement.scrollWidth<=frame.clientWidth+1,"No horizontal page overflow");
+  };
+  assert($("evidence").textContent==="7.692%","Default count evidence");validPlot();
+  click("pin");await pause();assert($("comparison").textContent.includes("1×"),"Pinned evidence initially equal");
+  d.querySelector('[data-preset="aligned"]').click();await pause();
+  assert(!$("comparison").textContent.includes("1×"),"Changed prior changes evidence ratio");
+  const firstEvidence=$("evidence").textContent;
+  change("likelihood-scale","actual");await pause();
+  assert($("evidence").textContent===firstEvidence,"Display scaling leaves evidence unchanged");validPlot();
+  change("data-n",3,"input");await pause();
+  assert($("data-k").value==="3"&&$("data-k-range").max==="3","Heads clamp to reduced trial count");
+  change("data-n",0,"change");assert($("data-n").value==="1","Invalid count clamps on commit");
+  const beforeEmpty=$("evidence").textContent;
+  change("data-n","","input");assert($("evidence").textContent===beforeEmpty,"Empty numeric input preserves state");
+  change("data-n","","change");assert($("data-n").value==="1","Empty numeric input restores on commit");
+  for(const family of ["beta","gamma","normal"]){
+    change("model",family);await pause();
+    assert($("pinned-key").hidden,"Model switch clears incompatible pinned prior");
+    for(const preset of ["broad","aligned","sceptical","confident"]){
+      d.querySelector(`[data-preset="${preset}"]`).click();await pause();validPlot();
+      for(const input of d.querySelectorAll('input[type="number"]'))assert(input.validity.valid,"Preset inputs valid: "+input.id+"="+input.value);
+    }
+    if(family==="beta") {change("prior-a",.1,"input");change("data-k",0,"input");}
+    if(family==="gamma") {change("prior-a",.1,"input");change("data-k",0,"input");}
+    if(family==="normal") {change("prior-sd",.1,"input");change("prior-mean",-10,"input");change("data-y",5,"input");change("data-se",.05,"input");}
+    await pause();validPlot();
+    if(family==="normal")assert($("evidence").textContent.includes("10")&&!$("evidence").textContent.includes("0 ×"),"Extreme evidence avoids underflow");
+    for(const mode of ["density","actual"]){
+      change("likelihood-scale",mode);
+      for(const scale of ["linear","log"]){click(scale);await pause();validPlot();}
+    }
+    click("pin");await pause();validPlot();
+    click("unpin");assert($("pinned-key").hidden,"Clear pinned prior");
+    click("reset");await pause();validPlot();
+    frame.style.width="375px";await pause();validPlot();
+    frame.style.width="1200px";await pause();
+  }
+  assert(!errors.length,"No JavaScript errors: "+errors.join("; "));
+  document.body.dataset.result="passed";
+  document.getElementById("result").textContent=`${count} checks passed (SciPy references, integration, UI, responsive layout).`;
+}
+run().catch(e=>{document.body.dataset.result="failed";document.getElementById("result").textContent=e.stack;});
+</script></body></html>

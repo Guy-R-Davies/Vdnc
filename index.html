@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An interactive, one-dimensional view of Bayesian updating and evidence. All calculations run in your browser.">
+  <title>Bayesian updating · Vdnc</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23173554'/%3E%3Cpath d='M4 26C12 26 10 6 16 6S20 26 28 26' stroke='%2374d9bc' stroke-width='2.5' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script src="math.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+<main>
+  <header class="page-header">
+    <div><div class="eyebrow">A little Bayesian intuition</div><h1>Bayesian updating</h1></div>
+    <div class="equation" aria-label="Posterior equals prior times likelihood divided by evidence"><span class="posterior-color">Posterior</span><span>=</span><span class="fraction"><span><span class="prior-color">Prior</span> × <span class="likelihood-color">Likelihood</span></span><span>Evidence</span></span></div>
+  </header>
+
+  <div class="workspace">
+    <aside class="panel controls" aria-label="Model and parameters">
+      <label class="eyebrow" for="model">The experiment</label>
+      <select id="model">
+        <option value="beta">Coin tosses</option>
+        <option value="gamma">Arrivals per hour</option>
+        <option value="normal">A noisy measurement</option>
+      </select>
+      <p id="model-pair" class="model-pair">Beta prior · Binomial likelihood</p>
+      <section class="control-section">
+        <div class="section-heading"><h2><i class="dot prior-bg"></i>Prior</h2><span id="prior-family">Beta(α, β)</span></div>
+        <div id="prior-controls"></div>
+        <div class="presets" aria-label="Prior presets">
+          <button type="button" data-preset="broad">Flat</button>
+          <button type="button" data-preset="aligned">Aligned</button>
+          <button type="button" data-preset="sceptical">Sceptical</button>
+          <button type="button" data-preset="confident">Confident</button>
+        </div>
+      </section>
+      <section class="control-section data-controls">
+        <div class="section-heading"><h2><i class="dot likelihood-bg"></i>Data</h2><span id="data-family">Binomial(k, n)</span></div>
+        <div id="data-controls"></div>
+        <div id="experiment" class="experiment" aria-hidden="true"></div>
+        <p id="data-summary" class="data-summary"></p>
+      </section>
+      <button type="button" id="reset" class="reset">Reset experiment <span aria-hidden="true">↺</span></button>
+    </aside>
+
+    <div class="results">
+      <section class="panel plot-panel" aria-label="Prior, likelihood, and posterior plot">
+        <div class="plot-toolbar">
+          <div class="legend"><span class="prior-key">Prior</span><span class="likelihood-key">Likelihood</span><span class="posterior-key">Posterior</span><span id="pinned-key" class="pinned-key" hidden>Pinned prior</span></div>
+          <div class="plot-options">
+            <label for="likelihood-scale" class="sr-only">Likelihood display</label>
+            <select id="likelihood-scale" title="Unit area compares shapes; actual uses a separate likelihood axis."><option value="density">Likelihood: unit area</option><option value="actual">Likelihood: actual</option></select>
+            <div class="segmented" aria-label="Vertical scale"><button type="button" id="linear" aria-pressed="true">Linear</button><button type="button" id="log" aria-pressed="false">Log</button></div>
+          </div>
+        </div>
+        <div id="plot" class="plot"></div>
+        <div class="plot-caption"><span id="scale-note">Likelihood rescaled to area 1; evidence uses its actual value.</span><span id="boundary-note" hidden>Endpoint peaks → ∞</span></div>
+        <div class="distribution-stats"><div><span class="prior-color">Prior mean</span><strong id="prior-mean"></strong></div><div><span class="likelihood-color">Data estimate</span><strong id="data-estimate"></strong></div><div><span class="posterior-color">Posterior mean</span><strong id="posterior-mean"></strong></div></div>
+      </section>
+
+      <section class="evidence-panel" aria-label="Evidence and prior comparison">
+        <div class="evidence-main"><div class="eyebrow">Evidence <span class="math-label">Z = ∫ L(θ) π(θ) dθ</span></div><div class="evidence-value" id="evidence"></div><div id="evidence-caption" class="evidence-caption"></div><div id="log-evidence" class="log-evidence"></div></div>
+        <div class="evidence-comparison"><button type="button" id="pin">Pin this prior <span aria-hidden="true">＋</span></button><div id="comparison" aria-live="polite"><p class="comparison-hint">Pin a prior, then change it.</p></div></div>
+      </section>
+      <p class="footer-note">1D conjugate models <span>·</span> Exact evidence <span>·</span> Runs in your browser</p>
+    </div>
+  </div>
+  <noscript>Please enable JavaScript to explore the distributions.</noscript>
+</main>
+</body>
+</html>
