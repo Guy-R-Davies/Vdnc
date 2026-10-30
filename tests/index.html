@@ -45,11 +45,48 @@ async function run(){
   w.addEventListener("error",e=>errors.push(e.message));
   const change=(id,value,type="change")=>{const e=$(id);e.value=value;e.dispatchEvent(new w.Event(type,{bubbles:true}));};
   const click=id=>$(id).click();
+  const displayedMeans=()=>[...d.querySelectorAll(".distribution-stats strong")].map(e=>Number(e.textContent.replaceAll(",","")));
+  const checkMeans=(prior,estimate,posterior)=>{
+    const actual=displayedMeans();
+    [prior,estimate,posterior].forEach((expected,i)=>assert(Math.abs(actual[i]-expected)<=.0005*Math.max(1,Math.abs(expected)),`Displayed statistic ${i}: ${actual[i]} vs ${expected}`));
+  };
+  const uniqueIDs=()=>{
+    const ids=[...d.querySelectorAll("[id]")].map(e=>e.id);
+    assert(new Set(ids).size===ids.length,"All controls and readouts have unique IDs");
+  };
+  const checkCurrentStats=family=>{
+    const v=id=>$(id).valueAsNumber;
+    let prior,estimate,posterior;
+    if(family==="beta"){
+      const a=v("prior-a"),b=v("prior-b"),k=v("data-k"),n=v("data-n");
+      prior=a/(a+b);estimate=k/n;posterior=(a+k)/(a+b+n);
+    }else if(family==="gamma"){
+      const a=v("prior-a"),s=v("prior-scale"),k=v("data-k"),t=v("data-t");
+      prior=a*s;estimate=k/t;posterior=(a+k)*s/(1+s*t);
+    }else{
+      const mean=v("prior-mean"),sd=v("prior-sd"),y=v("data-y"),se=v("data-se");
+      prior=mean;estimate=y;posterior=(se**2*mean+sd**2*y)/(sd**2+se**2);
+    }
+    checkMeans(prior,estimate,posterior);
+    for(const input of d.querySelectorAll('input[type="number"]')){
+      assert(input.validity.valid,"Valid numeric control: "+input.id);
+      assert(input.valueAsNumber===$(input.id+"-range").valueAsNumber,"Input and slider agree: "+input.id);
+    }
+  };
   const validPlot=()=>{
     assert($("plot").querySelectorAll("path").length>=5,"Plot rendered");
     for(const path of $("plot").querySelectorAll("path"))assert(!/NaN|Infinity|undefined/.test(path.getAttribute("d")),"Finite SVG path");
     assert(!d.documentElement.scrollWidth || d.documentElement.scrollWidth<=frame.clientWidth+1,"No horizontal page overflow");
   };
+  // Reproduce the reported stale readout before exercising any other controls.
+  change("model","normal");await pause();
+  checkMeans(0,2,72/37);uniqueIDs();
+  change("prior-mean",-2,"input");await pause();
+  checkMeans(-2,2,70/37);
+  change("prior-mean-range",1.5,"input");await pause();
+  checkMeans(1.5,2,73.5/37);
+  assert($("prior-mean").value==="1.5","Mean slider updates its numeric input");
+  change("model","beta");await pause();
   assert($("evidence").textContent==="7.692%","Default count evidence");validPlot();
   click("pin");await pause();assert($("comparison").textContent.includes("1×"),"Pinned evidence initially equal");
   d.querySelector('[data-preset="aligned"]').click();await pause();
@@ -65,9 +102,12 @@ async function run(){
   change("data-n","","change");assert($("data-n").value==="1","Empty numeric input restores on commit");
   for(const family of ["beta","gamma","normal"]){
     change("model",family);await pause();
+    uniqueIDs();checkCurrentStats(family);
+    if(family==="gamma")assert(d.querySelector('[data-preset="broad"]').getAttribute("aria-pressed")==="false","Gamma default is not the broad preset");
     assert($("pinned-key").hidden,"Model switch clears incompatible pinned prior");
     for(const preset of ["broad","aligned","sceptical","confident"]){
       d.querySelector(`[data-preset="${preset}"]`).click();await pause();validPlot();
+      uniqueIDs();checkCurrentStats(family);
       for(const input of d.querySelectorAll('input[type="number"]'))assert(input.validity.valid,"Preset inputs valid: "+input.id+"="+input.value);
     }
     if(family==="beta") {change("prior-a",.1,"input");change("data-k",0,"input");}
@@ -82,6 +122,32 @@ async function run(){
     click("pin");await pause();validPlot();
     click("unpin");assert($("pinned-key").hidden,"Clear pinned prior");
     click("reset");await pause();validPlot();
+    checkCurrentStats(family);
+    // Exercise every numeric control through both input methods and its bounds.
+    const controls=[...d.querySelectorAll('input[type="number"]')].map(e=>e.id);
+    for(const id of controls){
+      const input=$(id),min=Number(input.min),max=Number(input.max),step=Number(input.step);
+      const middle=Number((min+Math.round((max-min)/2/step)*step).toFixed(8));
+      for(const [target,value] of [[id,min],[id+"-range",middle],[id,max]]){
+        change(target,value,target===id?"change":"input");await pause();
+        checkCurrentStats(family);validPlot();
+      }
+    }
+    click("reset");await pause();
+    // A pinned prior stays fixed while both evidences use the new data.
+    click("pin");
+    const pinnedInputs=family==="beta"?{a:1,b:1}:family==="gamma"?{a:2,scale:2}:{mean:0,sd:3};
+    if(family==="normal")change("prior-mean",1,"change");else change("prior-a",3,"change");
+    if(family==="normal")change("data-y",1.5,"change");else change("data-k",4,"change");
+    await pause();
+    const activeInputs=family==="beta"?{a:3,b:1}:family==="gamma"?{a:3,scale:2}:{mean:1,sd:3};
+    const activeData=family==="beta"?{k:4,n:12}:family==="gamma"?{k:4,t:2}:{y:1.5,se:.5};
+    const activeModel=Bayes.model(family,activeInputs,activeData),pinnedModel=Bayes.model(family,pinnedInputs,activeData);
+    const ratio=Number($("comparison").querySelector(".comparison-ratio").textContent.replace("×",""));
+    assert(Math.abs(ratio/Math.exp(activeModel.logZ-pinnedModel.logZ)-1)<.0005,"Pinned comparison follows current data");
+    const shownLogZ=Number($("log-evidence").textContent.match(/ln Z = ([^ ·]+)/)[1]);
+    assert(Math.abs(shownLogZ-activeModel.logZ)<.000051,"Evidence readout follows parameters");
+    click("reset");await pause();
     frame.style.width="375px";await pause();validPlot();
     frame.style.width="1200px";await pause();
   }

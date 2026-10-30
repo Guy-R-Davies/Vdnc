@@ -78,7 +78,7 @@
     document.querySelector('[data-preset="broad"]').textContent=family==="beta"?"Flat":"Broad";
   }
   function reset() {
-    prior={...config[family].prior}; data={...config[family].data}; pinned=null; activePreset="broad";
+    prior={...config[family].prior}; data={...config[family].data}; pinned=null; activePreset=family==="gamma"?null:"broad";
     renderControls(); update();
   }
   function preset(kind) {
@@ -98,9 +98,9 @@
   }
   function update() {
     current=Bayes.model(family,prior,data); reference=pinned?Bayes.model(family,pinned,data):null;
-    $("prior-mean").textContent=fmt(current.priorMean); $("prior-mean").title=current.priorDescription;
-    $("posterior-mean").textContent=fmt(current.posteriorMean); $("posterior-mean").title=current.posteriorDescription;
-    $("data-estimate").textContent=fmt(current.estimate);
+    $("prior-mean-value").textContent=fmt(current.priorMean); $("prior-mean-value").title=current.priorDescription;
+    $("posterior-mean-value").textContent=fmt(current.posteriorMean); $("posterior-mean-value").title=current.posteriorDescription;
+    $("data-estimate-value").textContent=fmt(current.estimate);
     document.querySelectorAll("[data-preset]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.preset===activePreset)));
     const experiment=$("experiment");
     if(family==="beta") {
